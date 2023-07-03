@@ -60,7 +60,7 @@ class MyListener(StreamListener):
         print(f"Streaming error occurred: {error}")
 
 # Create an instance of Mastodon
-mastodon = Mastodon(access_token='pytooter_usercred.secret')
+mastodon = Mastodon(access_token='backend_mastodon_usercred.secret')
 
 # Create an instance of the custom listener
 listener = MyListener()
