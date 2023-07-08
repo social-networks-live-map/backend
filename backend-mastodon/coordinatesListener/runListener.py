@@ -14,6 +14,7 @@ html_file = "templates/status_list.html"
 # Ensure the data and archive folders exist
 os.makedirs(data_folder, exist_ok=True)
 os.makedirs(archive_folder, exist_ok=True)
+os.makedirs(templates, exist_ok=True)
 
 # Regular expression pattern to match coordinates
 coord_pattern = r'(\-?\d+\.\d+),\s*(\-?\d+\.\d+)'
