@@ -1,2 +1,3 @@
 env
 data
+templates/status_list.html
