@@ -9,12 +9,13 @@ import re
 # Define the path for the data folder
 data_folder = "data"
 archive_folder = os.path.join(data_folder, "archive")
-html_file = "templates/status_list.html"
+templates_folder = "templates"
+html_file = os.path.join(templates_folder, "status_list.html")
 
 # Ensure the data and archive folders exist
 os.makedirs(data_folder, exist_ok=True)
 os.makedirs(archive_folder, exist_ok=True)
-os.makedirs(templates, exist_ok=True)
+os.makedirs(templates_folder, exist_ok=True)
 
 # Regular expression pattern to match coordinates
 coord_pattern = r'(\-?\d+\.\d+),\s*(\-?\d+\.\d+)'
@@ -26,43 +27,10 @@ class DateTimeEncoder(json.JSONEncoder):
             return obj.strftime('%Y-%m-%d %H:%M:%S')
         return super().default(obj)
 
-# Custom listener class
-class MyListener(StreamListener):
-    def __init__(self):
-        super().__init__()
-        self.status_list = []
-        self.update_status_list()
-        self.update_html_file()
-
-    def on_update(self, status):
-        # Check if the content matches the coordinates pattern
-        content = status['content']
-        if re.search(coord_pattern, content):
-            coordinates = re.findall(coord_pattern, content)
-            # Perform further processing or actions with the matched coordinates
-            print("Coordinates found:", coordinates, "in message", status['url'])
-
-            status['coordinates'] = {'latitude': coordinates[0][0], 'longitude': coordinates[0][1]}
-
-            message_id = status['id']
-            filename = f'{message_id}.json'
-            filepath = os.path.join(data_folder, filename)
-
-            # Save the relevant information to a JSON file
-            with open(filepath, 'a') as output_file:
-                json.dump(status, output_file, cls=DateTimeEncoder)
-                output_file.write('\n')
-
-            # Move the file to the archive folder
-            #archive_filepath = os.path.join(archive_folder, filename)
-            #shutil.move(filepath, archive_filepath)
-            #print(f"Moved file {filename} to archive folder")
-
-            # Update the status list
-            self.update_status_list()
-
-            # Update the HTML file
-            self.update_html_file()
+class HtmlUpdater:
+    def __init__(self, status_list, html_file):
+        self.status_list = status_list
+        self.html_file = html_file
 
     def update_status_list(self):
         self.status_list = []
@@ -134,7 +102,7 @@ class MyListener(StreamListener):
         html_content += """
                 </table>
                 <br>
-                <button type='button' onclick='updateJsons()'>OK</button>
+                <button type='button' onclick='updateJsons(); updateHtml()'>OK</button>
             </form>
             <script src="{{ url_for('static', filename='script.js') }}"></script>
         </body>
@@ -146,27 +114,63 @@ class MyListener(StreamListener):
             file.write(html_content)
 
 
+# Custom listener class
+class MyListener(StreamListener):
+    def __init__(self):
+        super().__init__()
+        self.status_list = []
+        self.html_updater = HtmlUpdater(self.status_list, html_file)
+        self.html_updater.update_status_list()
+        self.html_updater.update_html_file()
+
+    def on_update(self, status):
+        # Check if the content matches the coordinates pattern
+        content = status['content']
+        if re.search(coord_pattern, content):
+            coordinates = re.findall(coord_pattern, content)
+            # Perform further processing or actions with the matched coordinates
+            print("Coordinates found:", coordinates, "in message", status['url'])
+
+            status['coordinates'] = {'latitude': coordinates[0][0], 'longitude': coordinates[0][1]}
+
+            message_id = status['id']
+            filename = f'{message_id}.json'
+            filepath = os.path.join(data_folder, filename)
+
+            # Save the relevant information to a JSON file
+            with open(filepath, 'a') as output_file:
+                json.dump(status, output_file, cls=DateTimeEncoder)
+                output_file.write('\n')
+
+            # Move the file to the archive folder
+            #archive_filepath = os.path.join(archive_folder, filename)
+            #shutil.move(filepath, archive_filepath)
+            #print(f"Moved file {filename} to archive folder")
+
+            # Update the status list
+            self.html_updater.update_status_list()
+            # Update the HTML file
+            self.html_updater.update_html_file()
+
     def on_streaming_error(self, error):
         print(f"Streaming error occurred: {error}")
 
+def start_listener(listener):
+    # Create an instance of Mastodon
+    mastodon = Mastodon(access_token='../backend_mastodon_usercred.secret')
 
-# Create an instance of Mastodon
-mastodon = Mastodon(access_token='../backend_mastodon_usercred.secret')
+    # Retry the connection with exponential backoff
+    retry_delay = 5  # Initial delay in seconds
+    max_retries = 10  # Maximum number of retries
+    retry_count = 0  # Counter for tracking retries
 
-# Create an instance of the custom listener
-listener = MyListener()
+    while retry_count < max_retries:
+        try:
+            mastodon.stream_public(listener)
+        except Exception as e:
+            print(f"Connection error occurred: {e}")
+            retry_count += 1
+            print(f"Retrying in {retry_delay} seconds...")
+            time.sleep(retry_delay)
+            retry_delay *= 2  # Exponential backoff
 
-# Retry the connection with exponential backoff
-retry_delay = 5  # Initial delay in seconds
-max_retries = 10  # Maximum number of retries
-retry_count = 0  # Counter for tracking retries
-
-while retry_count < max_retries:
-    try:
-        mastodon.stream_public(listener)
-    except Exception as e:
-        print(f"Connection error occurred: {e}")
-        retry_count += 1
-        print(f"Retrying in {retry_delay} seconds...")
-        time.sleep(retry_delay)
-        retry_delay *= 2  # Exponential backoff
