@@ -67,3 +67,12 @@ function updateHtml() {
       location.reload(); // Reload the page on error
     });
 }
+
+function toggleCheckboxes() {
+  const selectAllCheckbox = document.getElementById('select-all-checkbox');
+  const checkboxes = document.getElementsByName('status-checkbox');
+
+  checkboxes.forEach((checkbox) => {
+    checkbox.checked = selectAllCheckbox.checked;
+  });
+}

@@ -62,7 +62,10 @@ class HtmlUpdater:
                         <th>Google Maps Link</th>
                         <th>Latitude</th>
                         <th>Longitude</th>
-                        <th>Keep</th>
+                        <th>
+                            <label for="select-all-checkbox">Keep/Reply</label><br>
+                            <input type="checkbox" id="select-all-checkbox" onchange="toggleCheckboxes()">
+                        </th>
                     </tr>
         """
 
@@ -114,6 +117,7 @@ class HtmlUpdater:
             file.write(html_content)
 
 
+
 # Custom listener class
 class MyListener(StreamListener):
     def __init__(self):
@@ -129,28 +133,33 @@ class MyListener(StreamListener):
         if re.search(coord_pattern, content):
             coordinates = re.findall(coord_pattern, content)
             # Perform further processing or actions with the matched coordinates
-            print("Coordinates found:", coordinates, "in message", status['url'])
+            latitude = float(coordinates[0][0])
+            longitude = float(coordinates[0][1])
 
-            status['coordinates'] = {'latitude': coordinates[0][0], 'longitude': coordinates[0][1]}
+            # Check the range of latitude and longitude values
+            if -90 <= latitude <= 90 and -180 <= longitude <= 180:
+                print("Coordinates found:", coordinates, "in message", status['url'])
 
-            message_id = status['id']
-            filename = f'{message_id}.json'
-            filepath = os.path.join(data_folder, filename)
+                status['coordinates'] = {'latitude': latitude, 'longitude': longitude}
 
-            # Save the relevant information to a JSON file
-            with open(filepath, 'a') as output_file:
-                json.dump(status, output_file, cls=DateTimeEncoder)
-                output_file.write('\n')
+                message_id = status['id']
+                filename = f'{message_id}.json'
+                filepath = os.path.join(data_folder, filename)
 
-            # Move the file to the archive folder
-            #archive_filepath = os.path.join(archive_folder, filename)
-            #shutil.move(filepath, archive_filepath)
-            #print(f"Moved file {filename} to archive folder")
+                # Save the relevant information to a JSON file
+                with open(filepath, 'a') as output_file:
+                    json.dump(status, output_file, cls=DateTimeEncoder)
+                    output_file.write('\n')
 
-            # Update the status list
-            self.html_updater.update_status_list()
-            # Update the HTML file
-            self.html_updater.update_html_file()
+                # Move the file to the archive folder
+                #archive_filepath = os.path.join(archive_folder, filename)
+                #shutil.move(filepath, archive_filepath)
+                #print(f"Moved file {filename} to archive folder")
+
+                # Update the status list
+                self.html_updater.update_status_list()
+                # Update the HTML file
+                self.html_updater.update_html_file()
 
     def on_streaming_error(self, error):
         print(f"Streaming error occurred: {error}")
